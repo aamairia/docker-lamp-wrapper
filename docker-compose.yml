@@ -1,0 +1,88 @@
+version: '3.3'
+services:
+  apache2:
+    build:
+      context: .docker/apache2/
+    container_name: app_apache2
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - backend
+    depends_on:
+      - php
+      - mariadb
+    volumes:
+      - ./app/:/var/www/html/app/
+      - ./logs/apache2:/var/log/apache2/
+      - ./.docker/apache2/vhosts/app.conf:/etc/apache2/sites-enabled/app.conf
+      - ./.docker/apache2/ssl/server.crt:/etc/apache2/ssl/server.crt
+      - ./.docker/apache2/ssl/server.key:/etc/apache2/ssl/server.key
+
+  php:
+    build:
+      context: .docker/
+      dockerfile: ./php/Dockerfile
+    container_name: app_php
+    networks:
+      - backend
+    volumes:
+      - ./app/:/var/www/html/app/
+      - ./logs/php/:/var/log/
+    ports:
+      - "9000:9000"
+
+
+  mariadb:
+    image: 'bitnami/mariadb:latest'
+    container_name: app_mariadb
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "3306:3306"
+      - "3307:3307"
+    volumes:
+      - mariadb_data:/bitnami
+    networks:
+      - backend
+
+  phpmyadmin:
+    container_name: app_phpmyadmin
+    image: bitnami/phpmyadmin:latest
+    depends_on:
+      - mariadb
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - phpmyadmin_data:/bitnami
+    networks:
+      - backend
+
+  maildev:
+    image: maildev/maildev
+    container_name: app_maildev
+    command: bin/maildev --web 80 --smtp 25 --hide-extensions STARTTLS
+    networks:
+      - backend
+    ports:
+      - "1080:80"
+      - "1025:25"
+
+  adminer:
+    image: adminer
+    container_name: app_adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+    driver: local
+  phpmyadmin_data:
+    driver: local
